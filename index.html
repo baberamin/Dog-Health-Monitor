@@ -1,0 +1,478 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2575.7">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 11.0px Helvetica}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 11.0px Helvetica; min-height: 13.0px}
+  </style>
+</head>
+<body>
+<p class="p1">&lt;!DOCTYPE html&gt;</p>
+<p class="p1">&lt;html lang="en"&gt;</p>
+<p class="p1">&lt;head&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;meta charset="UTF-8"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;title&gt;Pooch Monitor: Health Tracker&lt;/title&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script src="https://cdn.tailwindcss.com"&gt;&lt;/script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;style&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>body { font-family: 'Inter', sans-serif; background-color: #f7fafc; }</p>
+<p class="p1"><span class="Apple-converted-space">        </span>/* Custom scrollbar for better aesthetics */</p>
+<p class="p1"><span class="Apple-converted-space">        </span>.custom-scrollbar::-webkit-scrollbar { width: 6px; }</p>
+<p class="p1"><span class="Apple-converted-space">        </span>.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }</p>
+<p class="p1"><span class="Apple-converted-space">        </span>.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }</p>
+<p class="p1"><span class="Apple-converted-space">        </span>.spinner { border-top-color: #3b82f6; -webkit-animation: spin 1s ease-in-out infinite; animation: spin 1s ease-in-out infinite; }</p>
+<p class="p1"><span class="Apple-converted-space">        </span>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/style&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;!-- Firebase Imports --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script type="module"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";</p>
+<p class="p1"><span class="Apple-converted-space">        </span>import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";</p>
+<p class="p1"><span class="Apple-converted-space">        </span>import { getFirestore, doc, onSnapshot, collection, query, orderBy, limit, addDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Global Firebase variables will be populated here</p>
+<p class="p1"><span class="Apple-converted-space">        </span>window.firebase = {};</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// --- Global Constants from Environment (MANDATORY) ---</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const LLM_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=";</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const apiKey = "" // API key is provided by the canvas environment</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>setLogLevel('Debug');</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>/**</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* Initializes Firebase and authenticates the user.</p>
+<p class="p1"><span class="Apple-converted-space">         </span>*/</p>
+<p class="p1"><span class="Apple-converted-space">        </span>async function initFirebase() {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>try {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>console.error("Firebase config is missing.");</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>document.getElementById('analysis-status').textContent = "Error: Firebase configuration is missing.";</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>return;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>const app = initializeApp(firebaseConfig);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const db = getFirestore(app);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const auth = getAuth(app);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>window.firebase.db = db;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>window.firebase.auth = auth;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>window.firebase.appId = appId;</p>
+<p class="p2"><span class="Apple-converted-space">                </span></p>
+<p class="p1"><span class="Apple-converted-space">                </span>let userId = null;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>onAuthStateChanged(auth, async (user) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (user) {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>userId = user.uid;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>console.log("Authenticated with UID:", userId);</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>window.firebase.userId = userId;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>window.setupListeners();</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>// Attempt to authenticate</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>if (initialAuthToken) {</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>await signInWithCustomToken(auth, initialAuthToken);</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>await signInAnonymously(auth);</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>});</p>
+<p class="p1"><span class="Apple-converted-space">            </span>} catch (error) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>console.error("Firebase initialization or authentication failed:", error);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>/**</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* Converts a File object to a Base64 string for the API.</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* @param {File} file<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">         </span>* @returns {Promise&lt;string&gt;} Base64 data string</p>
+<p class="p1"><span class="Apple-converted-space">         </span>*/</p>
+<p class="p1"><span class="Apple-converted-space">        </span>function fileToBase64(file) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>return new Promise((resolve, reject) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const reader = new FileReader();</p>
+<p class="p1"><span class="Apple-converted-space">                </span>reader.readAsDataURL(file);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>reader.onload = () =&gt; resolve(reader.result.split(',')[1]);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>reader.onerror = error =&gt; reject(error);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>});</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>/**</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* Generates the API call payload.</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* @param {string} base64Image</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* @param {string} mimeType</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* @param {string} prompt</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* @returns {Object}</p>
+<p class="p1"><span class="Apple-converted-space">         </span>*/</p>
+<p class="p1"><span class="Apple-converted-space">        </span>function generateApiPayload(base64Image, mimeType, prompt) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const systemPrompt = "You are a specialized Veterinary Assistant AI. Analyze the provided image of dog feces and the accompanying health notes. Provide a brief (2-3 sentence) summary of your findings on color, consistency, and presence of anomalies. Conclude your response with a clear status indicator. Only use one of these three status markers at the very start of your reply: 'STATUS: NORMAL', 'STATUS: MONITOR', or 'STATUS: VET_URGENT'. Do not add any extra text before the status. E.g., 'STATUS: NORMAL. The feces appear...', 'STATUS: VET_URGENT. The photo suggests...'.";</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>return {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>contents: [{</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>role: "user",</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>parts: [</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>{ text: prompt },</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>{</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>inlineData: {</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>mimeType: mimeType,</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>data: base64Image</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>]</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}],</p>
+<p class="p1"><span class="Apple-converted-space">                </span>systemInstruction: {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>parts: [{ text: systemPrompt }]</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>};</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>/**</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* Calls the Gemini API for analysis.</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* @param {Object} payload<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">         </span>* @returns {Promise&lt;{text: string, status: string}&gt;}</p>
+<p class="p1"><span class="Apple-converted-space">         </span>*/</p>
+<p class="p1"><span class="Apple-converted-space">        </span>async function callGeminiApi(payload) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>let attempt = 0;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const maxRetries = 5;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>while (attempt &lt; maxRetries) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>try {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>const response = await fetch(LLM_API_URL, {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>method: 'POST',</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>headers: { 'Content-Type': 'application/json' },</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>body: JSON.stringify(payload)</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>});</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (!response.ok) {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>throw new Error(`HTTP error! status: ${response.status}`);</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>const result = await response.json();</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "Analysis failed to produce text.";</p>
+<p class="p2"><span class="Apple-converted-space">                    </span></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>// Simple parsing for the STATUS marker</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>let status = "UNKNOWN";</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>const statusMatch = text.match(/STATUS: (NORMAL|MONITOR|VET_URGENT)/);</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (statusMatch) {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>status = statusMatch[1];</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>return { text: text.replace(/STATUS: (NORMAL|MONITOR|VET_URGENT)\.?\s*/, '').trim(), status };</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>} catch (error) {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>attempt++;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>console.error(`Attempt ${attempt} failed:`, error);</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (attempt &gt;= maxRetries) {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>throw new Error("Failed to connect to AI after multiple retries.");</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>// Exponential backoff</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>await new Promise(resolve =&gt; setTimeout(resolve, Math.pow(2, attempt) * 1000));</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><span class="Apple-converted-space">        </span></p>
+<p class="p1"><span class="Apple-converted-space">        </span>/**</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* Renders the history from Firestore and checks for alerts.</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* @param {Array} records<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">         </span>*/</p>
+<p class="p1"><span class="Apple-converted-space">        </span>function renderHistory(records) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const historyContainer = document.getElementById('history-records');</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const alertBox = document.getElementById('vet-alert');</p>
+<p class="p1"><span class="Apple-converted-space">            </span>historyContainer.innerHTML = '';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>alertBox.classList.add('hidden'); // Reset alert</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (records.length &gt; 0) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>// Check for alert if we have at least two records</p>
+<p class="p1"><span class="Apple-converted-space">                </span>if (records.length &gt;= 2) {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>const currentStatus = records[0].analysisStatus;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>const previousStatus = records[1].analysisStatus;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (currentStatus === 'VET_URGENT' || (currentStatus === 'MONITOR' &amp;&amp; previousStatus === 'NORMAL')) {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>alertBox.classList.remove('hidden');</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>alertBox.innerHTML = `</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;div class="flex items-center space-x-2"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;svg class="w-6 h-6 text-red-700" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"&gt;&lt;path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"&gt;&lt;/path&gt;&lt;/svg&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;p class="font-bold text-red-800"&gt;Alert: Status Change Detected!&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;p class="text-sm mt-1"&gt;The current entry shows a status of &lt;span class="font-semibold"&gt;${currentStatus}&lt;/span&gt;, which is a change from the previous &lt;span class="font-semibold"&gt;${previousStatus}&lt;/span&gt;. Please contact your veterinarian for professional guidance.&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>`;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>records.forEach((record, index) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>let statusColor = 'bg-gray-200 text-gray-800';</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>let statusIcon = 'ⓘ';</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (record.analysisStatus === 'NORMAL') {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>statusColor = 'bg-green-100 text-green-700';</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>statusIcon = '✓';</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>} else if (record.analysisStatus === 'MONITOR') {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>statusColor = 'bg-yellow-100 text-yellow-700';</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>statusIcon = '!';</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>} else if (record.analysisStatus === 'VET_URGENT') {</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>statusColor = 'bg-red-100 text-red-700';</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>statusIcon = '🚨';</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>const card = `</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;div class="bg-white p-4 rounded-lg shadow-md border-l-4 ${record.analysisStatus === 'VET_URGENT' ? 'border-red-500' : record.analysisStatus === 'MONITOR' ? 'border-yellow-500' : 'border-blue-500'} mb-4"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;div class="flex justify-between items-start mb-2 border-b pb-2"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;h3 class="font-bold text-lg text-blue-800"&gt;${new Date(record.timestamp).toLocaleString()}&lt;/h3&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;span class="px-3 py-1 text-xs font-semibold rounded-full ${statusColor} flex items-center space-x-1"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                    </span>&lt;span&gt;${statusIcon}&lt;/span&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                    </span>&lt;span&gt;${record.analysisStatus || 'UNKNOWN'}&lt;/span&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;/span&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;/div&gt;</p>
+<p class="p2"><span class="Apple-converted-space">                            </span></p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 text-sm"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                    </span>&lt;p class="font-semibold text-gray-600"&gt;Food Eaten:&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                    </span>&lt;p class="text-gray-700 mb-2"&gt;${record.foodNotes || 'N/A'}&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                    </span>&lt;p class="font-semibold text-gray-600"&gt;Dog Symptoms:&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                    </span>&lt;p class="text-gray-700"&gt;${record.symptomsNotes || 'N/A'}&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;div class="mt-4 md:mt-0"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                    </span>&lt;p class="font-semibold text-gray-600"&gt;AI Analysis:&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                    </span>&lt;p class="text-gray-700 bg-gray-50 p-3 rounded-md italic"&gt;${record.analysisResult || 'No result available.'}&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>&lt;p class="text-xs text-right text-gray-400 mt-2"&gt;Record ID: ${record.id.substring(0, 8)}&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>`;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>historyContainer.innerHTML += card;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>});</p>
+<p class="p1"><span class="Apple-converted-space">            </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>historyContainer.innerHTML = '&lt;p class="text-center text-gray-500 p-8"&gt;No records found. Submit your first analysis above!&lt;/p&gt;';</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>/**</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* Sets up the real-time listener for Firestore history.</p>
+<p class="p1"><span class="Apple-converted-space">         </span>*/</p>
+<p class="p1"><span class="Apple-converted-space">        </span>window.setupListeners = function() {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const db = window.firebase.db;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const userId = window.firebase.userId;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const appId = window.firebase.appId;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!db || !userId) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>console.error("Firebase not ready or User ID missing for listeners.");</p>
+<p class="p1"><span class="Apple-converted-space">                </span>return;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Path for private data: /artifacts/{appId}/users/{userId}/{collectionName}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const collectionPath = `artifacts/${appId}/users/${userId}/poop_records`;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const q = collection(db, collectionPath);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>// Fetch and sort locally as firestore's orderBy requires indices which can lead to errors.</p>
+<p class="p1"><span class="Apple-converted-space">            </span>// We fetch the entire collection (or use a large limit) and sort in JS.</p>
+<p class="p1"><span class="Apple-converted-space">            </span>onSnapshot(q, (snapshot) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const records = [];</p>
+<p class="p1"><span class="Apple-converted-space">                </span>snapshot.forEach((doc) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>records.push({ id: doc.id, ...doc.data() });</p>
+<p class="p1"><span class="Apple-converted-space">                </span>});</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>// Sort by timestamp descending</p>
+<p class="p1"><span class="Apple-converted-space">                </span>records.sort((a, b) =&gt; new Date(b.timestamp) - new Date(a.timestamp));</p>
+<p class="p1"><span class="Apple-converted-space">                </span>renderHistory(records);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}, (error) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>console.error("Error listening to history:", error);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>document.getElementById('analysis-status').textContent = `Error loading history: ${error.message}`;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>});</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>/**</p>
+<p class="p1"><span class="Apple-converted-space">         </span>* Handles the form submission.</p>
+<p class="p1"><span class="Apple-converted-space">         </span>*/</p>
+<p class="p1"><span class="Apple-converted-space">        </span>window.submitAnalysis = async function() {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const statusDiv = document.getElementById('analysis-status');</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const form = document.getElementById('analysis-form');</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const photoInput = document.getElementById('photo-input');</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const submitButton = document.getElementById('submit-button');</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const spinner = document.getElementById('spinner');</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!window.firebase.db || !window.firebase.userId) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>statusDiv.textContent = "Error: Authentication not complete. Please wait a moment and try again.";</p>
+<p class="p1"><span class="Apple-converted-space">                </span>statusDiv.className = "text-red-600 mt-4";</p>
+<p class="p1"><span class="Apple-converted-space">                </span>return;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>const photoFile = photoInput.files[0];</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const foodNotes = document.getElementById('food-notes').value;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const symptomsNotes = document.getElementById('symptoms-notes').value;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const timestamp = new Date().toISOString();</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (!photoFile) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>statusDiv.textContent = "Please take or select a photo of the sample.";</p>
+<p class="p1"><span class="Apple-converted-space">                </span>statusDiv.className = "text-yellow-600 mt-4";</p>
+<p class="p1"><span class="Apple-converted-space">                </span>return;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>// UI feedback</p>
+<p class="p1"><span class="Apple-converted-space">            </span>statusDiv.textContent = "Analysis in progress. This may take a few seconds...";</p>
+<p class="p1"><span class="Apple-converted-space">            </span>statusDiv.className = "text-blue-600 mt-4";</p>
+<p class="p1"><span class="Apple-converted-space">            </span>submitButton.disabled = true;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>spinner.classList.remove('hidden');</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>try {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>// 1. Convert image to Base64</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const base64Data = await fileToBase64(photoFile);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const mimeType = photoFile.type;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>// 2. Prepare prompt</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const prompt = `Analyze this image of dog feces.</p>
+<p class="p1"><span class="Apple-converted-space">                </span>Date/Time: ${new Date(timestamp).toLocaleString()}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>Food Notes: ${foodNotes || 'None provided.'}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>Dog Symptoms: ${symptomsNotes || 'None provided.'}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>Provide a professional, concise assessment (2-3 sentences) followed by the mandatory status marker (STATUS: NORMAL, MONITOR, or VET_URGENT).`;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>// 3. Call LLM API</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const payload = generateApiPayload(base64Data, mimeType, prompt);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const analysisResult = await callGeminiApi(payload);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>// 4. Save result to Firestore</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const db = window.firebase.db;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const userId = window.firebase.userId;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const appId = window.firebase.appId;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const collectionPath = `artifacts/${appId}/users/${userId}/poop_records`;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>await addDoc(collection(db, collectionPath), {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>timestamp: timestamp,</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>foodNotes: foodNotes,</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>symptomsNotes: symptomsNotes,</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>analysisResult: analysisResult.text,</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>analysisStatus: analysisResult.status,</p>
+<p class="p1"><span class="Apple-converted-space">                </span>});</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>// 5. Success</p>
+<p class="p1"><span class="Apple-converted-space">                </span>statusDiv.textContent = `Analysis complete! Status: ${analysisResult.status}. Record saved.`;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>statusDiv.className = "text-green-600 mt-4";</p>
+<p class="p1"><span class="Apple-converted-space">                </span>form.reset(); // Clear form after successful submission</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>} catch (error) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>console.error("Submission failed:", error);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>statusDiv.textContent = `Error during analysis or saving: ${error.message}`;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>statusDiv.className = "text-red-600 mt-4";</p>
+<p class="p1"><span class="Apple-converted-space">            </span>} finally {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>submitButton.disabled = false;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>spinner.classList.add('hidden');</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Initialize Firebase on window load</p>
+<p class="p1"><span class="Apple-converted-space">        </span>window.onload = initFirebase;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/script&gt;</p>
+<p class="p1">&lt;/head&gt;</p>
+<p class="p1">&lt;body class="bg-gray-50 min-h-screen"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;!-- Header --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;header class="text-center mb-10 pt-4"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;h1 class="text-4xl font-extrabold text-blue-900 tracking-tight"&gt;Pooch Monitor&lt;/h1&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;p class="mt-2 text-xl text-gray-600"&gt;Digital Health Log for Your Best Friend&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;p class="text-xs text-gray-400 mt-1"&gt;User ID: &lt;span id="user-id-display"&gt;Loading...&lt;/span&gt;&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;/header&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;!-- Main Content Grid --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="grid grid-cols-1 lg:grid-cols-3 gap-8"&gt;</p>
+<p class="p2"><span class="Apple-converted-space">            </span></p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;!-- Left Column: New Entry Form --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-2xl h-fit sticky top-6"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2"&gt;New Poop Log Entry&lt;/h2&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;form id="analysis-form" onsubmit="event.preventDefault(); submitAnalysis();"&gt;</p>
+<p class="p2"><span class="Apple-converted-space">                    </span></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;!-- Auto-Populated Date/Time --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;div class="mb-4"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;label class="block text-sm font-medium text-gray-700 mb-1"&gt;Entry Timestamp&lt;/label&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;p id="current-timestamp" class="text-lg font-semibold text-blue-600"&gt;&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>document.addEventListener('DOMContentLoaded', () =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>document.getElementById('current-timestamp').textContent = new Date().toLocaleString();</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>// Update every minute</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>setInterval(() =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                                    </span>document.getElementById('current-timestamp').textContent = new Date().toLocaleString();</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>}, 60000);</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>});</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;!-- Photo Input (Camera/File) --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;div class="mb-6"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;label for="photo-input" class="block text-sm font-medium text-gray-700 mb-1"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>Photo (Use Camera or Upload)</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/label&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;input type="file" id="photo-input" accept="image/*" capture="camera" required</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>class="w-full text-sm text-gray-500</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>file:mr-4 file:py-2 file:px-4</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>file:rounded-lg file:border-0</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>file:text-sm file:font-semibold</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>file:bg-blue-50 file:text-blue-700</p>
+<p class="p1"><span class="Apple-converted-space">                                </span>hover:file:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;!-- Food Eaten Notes --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;div class="mb-6"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;label for="food-notes" class="block text-sm font-medium text-gray-700 mb-1"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>Food Eaten (Past 12h)</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/label&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;textarea id="food-notes" rows="3" placeholder="e.g., Brand X kibble, half carrot, new treat Y."</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>class="mt-1 block w-full rounded-lg border border-gray-300 shadow-sm p-3 focus:border-blue-500 focus:ring-blue-500 resize-none"&gt;&lt;/textarea&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;!-- Symptoms Notes --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;div class="mb-6"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;label for="symptoms-notes" class="block text-sm font-medium text-gray-700 mb-1"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>Dog Symptoms (e.g., Energy, Thirst, Vomiting)</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;/label&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;textarea id="symptoms-notes" rows="3" placeholder="e.g., Slightly lethargic, drinking more water."</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>class="mt-1 block w-full rounded-lg border border-gray-300 shadow-sm p-3 focus:border-blue-500 focus:ring-blue-500 resize-none"&gt;&lt;/textarea&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;!-- Submit Button --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;button type="submit" id="submit-button"</p>
+<p class="p1"><span class="Apple-converted-space">                            </span>class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:opacity-50"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>Analyze &amp; Save Entry</p>
+<p class="p1"><span class="Apple-converted-space">                        </span>&lt;div id="spinner" class="spinner h-5 w-5 border-4 border-opacity-50 rounded-full hidden ml-3"&gt;&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;/button&gt;</p>
+<p class="p2"><span class="Apple-converted-space">                    </span></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;!-- Status Message --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;div id="analysis-status" class="mt-4 text-center text-sm font-medium"&gt;&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/form&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;!-- Right Column: History &amp; Alerts --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;div class="lg:col-span-2"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2"&gt;Health History &amp; Alerts&lt;/h2&gt;</p>
+<p class="p2"><span class="Apple-converted-space">                </span></p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;!-- Vet Alert Box --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div id="vet-alert" class="hidden bg-red-200 border border-red-400 text-red-700 p-4 rounded-xl mb-6 shadow-md" role="alert"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;!-- Alert content injected by JS --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;!-- History Records --&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div id="history-records" class="custom-scrollbar max-h-[80vh] overflow-y-auto"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>&lt;p class="text-center text-gray-500 p-8"&gt;Loading history...&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>// Update User ID Display after Auth</p>
+<p class="p1"><span class="Apple-converted-space">        </span>window.addEventListener('load', () =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const authInterval = setInterval(() =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>const userId = window.firebase &amp;&amp; window.firebase.userId;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>if (userId) {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>document.getElementById('user-id-display').textContent = userId;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>clearInterval(authInterval);</p>
+<p class="p1"><span class="Apple-converted-space">                </span>}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>}, 500);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/script&gt;</p>
+<p class="p1">&lt;/body&gt;</p>
+<p class="p1">&lt;/html&gt;</p>
+</body>
+</html>
