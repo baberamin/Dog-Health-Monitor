@@ -1,13 +1,14 @@
 <!-- 
-  Dog Health Tracker Application 
-  Built using HTML, Tailwind CSS, JavaScript, Firebase, and Gemini API.
+  Dog Health Tracker Application - REAL-TIME ANALYSIS ONLY
+  Built using HTML, Tailwind CSS, JavaScript, and Gemini API.
+  NOTE: This version is configured to use the API key automatically provided by the execution environment.
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pooch Monitor</title>
+    <title>Pooch Monitor - Real-Time</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Use Inter font family -->
@@ -41,7 +42,7 @@
         <!-- Header -->
         <header class="text-center space-y-2">
             <h1 class="text-4xl font-extrabold text-blue-800 tracking-tight">Pooch Monitor 🐾</h1>
-            <p class="text-gray-500">Track, analyze, and monitor your dog's daily health records.</p>
+            <p class="text-gray-500 font-semibold">Real-Time Analysis Only (No History Stored)</p>
         </header>
 
         <!-- Alert Message Box -->
@@ -51,19 +52,19 @@
 
         <!-- Submission Form -->
         <section class="border border-gray-200 rounded-lg p-5 space-y-5">
-            <h2 class="text-2xl font-semibold text-gray-700">New Health Record</h2>
+            <h2 class="text-2xl font-semibold text-gray-700">New Health Check</h2>
             <form id="recordForm" class="space-y-4">
                 
-                <!-- Date/Time Display -->
+                <!-- Date/Time & Status Display -->
                 <div class="flex flex-col sm:flex-row sm:space-x-4">
                     <div class="w-full sm:w-1/2">
-                        <label class="block text-sm font-medium text-gray-700">Date/Time</label>
+                        <label class="block text-sm font-medium text-gray-700">Current Date/Time</label>
                         <p id="dateTimeDisplay" class="mt-1 p-2 bg-gray-100 rounded-md text-gray-600 font-mono"></p>
                     </div>
-                    <!-- User ID Display -->
+                    <!-- Status Display (Updated to show No Storage) -->
                     <div class="w-full sm:w-1/2 mt-4 sm:mt-0">
-                        <label class="block text-sm font-medium text-gray-700">Your User ID (for history)</label>
-                        <p id="userIdDisplay" class="mt-1 p-2 bg-gray-100 rounded-md text-sm text-gray-500 truncate font-mono"></p>
+                        <label class="block text-sm font-medium text-gray-700">Storage Status</label>
+                        <p id="storageStatusDisplay" class="mt-1 p-2 bg-gray-100 rounded-md text-sm text-gray-500 font-mono">No Local or Cloud Storage</p>
                     </div>
                 </div>
 
@@ -105,7 +106,7 @@
                         class="w-full py-3 px-4 border border-transparent rounded-lg shadow-lg text-sm font-medium text-white 
                                bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
                                transition duration-150 ease-in-out disabled:bg-gray-400">
-                    Analyze & Save Record
+                    Analyze in Real-Time
                 </button>
                 <div id="loadingIndicator" class="hidden text-center text-blue-600 font-semibold mt-2">
                     Analyzing photo and consulting the AI...
@@ -113,19 +114,8 @@
             </form>
         </section>
 
-        <!-- History Section -->
-        <section class="space-y-4">
-            <h2 class="text-2xl font-semibold text-gray-700 flex justify-between items-center">
-                Health History
-                <span id="recordCount" class="text-sm text-gray-500 font-normal"></span>
-            </h2>
-            <div id="historyList" class="space-y-4">
-                <p id="historyPlaceholder" class="text-center text-gray-500 p-4 border rounded-lg">
-                    No records found yet. Submit a new analysis above!
-                </p>
-                <!-- Records will be injected here -->
-            </div>
-        </section>
+        <!-- The history section has been removed -->
+
     </div>
 
     <!-- Modals for LLM Response and Errors -->
@@ -141,64 +131,60 @@
         </div>
     </div>
 
-    <!-- Firebase SDK Imports -->
+    <!-- JavaScript Logic -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            collection, 
-            addDoc, 
-            onSnapshot, 
-            query, 
-            serverTimestamp 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // --- System-Provided Global Variables ---
-        // These variables are automatically injected by the environment for secure access.
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        // ------------------------------------------
-
-        // Global variables for Firebase services and user data
-        let app, db, auth;
-        let userId = null;
         
         // --- LLM API Configuration ---
+        // The API key is set to an empty string and is automatically injected by the environment at runtime.
         const LLM_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=";
-        const apiKey = ""; // Canvas provides this dynamically when running here
+        const apiKey = ""; 
 
         // --- Utility Functions ---
 
-        /** Formats a timestamp into a readable date and time string. */
-        function formatTimestamp(timestamp) {
-            if (!timestamp) return 'N/A';
-            // Check if it's a Firestore Timestamp object or a JS date/ms
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-            return date.toLocaleString();
-        }
+        /** Creates an immediate status alert based on the single analysis result. */
+        function displayImmediateAlert(status) {
+            const alertContainer = document.getElementById('alertContainer');
+            alertContainer.innerHTML = '';
+            alertContainer.classList.add('hidden');
 
-        /** Creates a status badge for the history display. */
-        function createStatusBadge(status) {
-            let color, text;
+            let alertMessage = null;
+            let alertType = 'info';
+
             switch (status) {
                 case 'VET_URGENT':
-                    color = 'bg-red-500';
-                    text = 'VET URGENT';
+                    alertMessage = "🔴 **VET URGENT:** The analysis suggests severe abnormalities. **Please contact your veterinarian immediately.** Do not wait.";
+                    alertType = 'danger';
                     break;
                 case 'MONITOR':
-                    color = 'bg-yellow-500';
-                    text = 'MONITOR';
+                    alertMessage = "⚠️ **MONITOR STATUS:** The analysis suggests a change. **Monitor your dog closely** for the next 24 hours. Consult a vet if symptoms worsen.";
+                    alertType = 'warning';
                     break;
                 case 'NORMAL':
+                    alertMessage = "🟢 **NORMAL:** The analysis suggests healthy stool and no immediate concerns. Keep up the good work!";
+                    alertType = 'success';
+                    break;
                 default:
-                    color = 'bg-green-500';
-                    text = 'NORMAL';
+                    alertMessage = "🔵 **ANALYSIS COMPLETE:** The AI has provided its findings. Review the details below.";
+                    alertType = 'info';
             }
-            return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color} text-white">${text}</span>`;
+
+            const colorMap = {
+                danger: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-400' },
+                warning: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-400' },
+                success: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-400' },
+                info: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-400' }
+            };
+            const colors = colorMap[alertType];
+
+            alertContainer.innerHTML = `
+                <div class="${colors.bg} ${colors.text} border-l-4 ${colors.border} p-4 rounded-lg shadow-md">
+                    <p class="font-bold">${alertMessage.split('**')[1] || 'Alert'}</p>
+                    <p class="text-sm mt-1">${alertMessage.replace(/<[^>]*>?/gm, '').replace(/\*\*/g, '').split('**')[2] || 'Review the details for more information.'}</p>
+                </div>
+            `;
+            alertContainer.classList.remove('hidden');
         }
-        
+
         /** Shows the custom modal with content. */
         function showModal(title, content) {
             document.getElementById('modalTitle').textContent = title;
@@ -210,36 +196,6 @@
         window.closeModal = function() {
             document.getElementById('modalOverlay').classList.remove('flex');
             document.getElementById('modalOverlay').classList.add('hidden');
-        }
-
-        // --- Firebase Initialization and Auth ---
-
-        async function initializeFirebase() {
-            try {
-                if (!firebaseConfig.apiKey) {
-                    throw new Error("Firebase configuration is missing. Cannot initialize application.");
-                }
-
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                
-                // Use the provided custom token for secure sign-in, or fall back to anonymous
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-                userId = auth.currentUser.uid;
-                document.getElementById('userIdDisplay').textContent = userId;
-                
-                // Start listening for data changes after successful auth
-                listenForRecords();
-            } catch (error) {
-                console.error("Firebase initialization or sign-in failed:", error);
-                showModal("Setup Error", `<p class="text-red-600">Failed to initialize the application.</p><p>Error: ${error.message}</p>`);
-            }
         }
         
         // --- LLM Interaction Functions ---
@@ -303,7 +259,8 @@
                     }
 
                     if (!response.ok) {
-                        throw new Error(`API request failed with status: ${response.status}`);
+                        const errorBody = await response.json();
+                        throw new Error(`API request failed with status: ${response.status}. Message: ${errorBody.error.message || 'Unknown error'}`);
                     }
 
                     const result = await response.json();
@@ -325,7 +282,7 @@
         }
 
 
-        // --- Form Submission and Data Saving ---
+        // --- Form Submission Logic ---
 
         document.getElementById('recordForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -339,13 +296,12 @@
                 showModal("Error", "<p>Please upload a photo of the dog poop.</p>");
                 return;
             }
-            if (!userId) {
-                showModal("Error", "<p>Application not ready. Please wait for Firebase initialization.</p>");
-                return;
-            }
+            
+            // NOTE: The check for YOUR_GEMINI_API_KEY is removed, as we rely on the environment.
 
             submitButton.disabled = true;
             loadingIndicator.classList.remove('hidden');
+            document.getElementById('alertContainer').classList.add('hidden'); // Clear previous alert
 
             try {
                 const file = photoInput.files[0];
@@ -353,11 +309,6 @@
 
                 reader.onloadend = async function() {
                     try {
-                        // Extract base64 part only
-                        // We also need to check the file type
-                        let mimeType = file.type;
-                        if (!mimeType.startsWith("image/")) mimeType = "image/jpeg"; // Default to jpeg if unknown
-                        
                         const base64Image = reader.result.split(',')[1]; 
 
                         // 1. Call LLM for analysis
@@ -373,28 +324,20 @@
                         ) || 'NORMAL';
                         const status = statusLine.trim().toUpperCase();
                         
-                        // 3. Save Record to Firestore
-                        await addDoc(collection(db, `artifacts/${appId}/users/${userId}/poop_records`), {
-                            timestamp: serverTimestamp(),
-                            foodNotes,
-                            symptomsNotes,
-                            analysisText,
-                            status: status,
-                            base64Image, // Save image for history viewing
-                            userId,
-                            mimeType // Save mime type for display
-                        });
-
-                        // 4. Show the Analysis Modal
+                        // 3. Show the Analysis Modal
                         showModal("AI Analysis", analysisText.replace(/\n/g, '<br>'));
                         
-                        // 5. Clear the form
+                        // 4. Display the immediate alert
+                        displayImmediateAlert(status);
+                        
+                        // 5. Clear the form (optional)
                         document.getElementById('recordForm').reset();
                         document.getElementById('photoPreview').classList.add('hidden');
 
                     } catch (error) {
-                        console.error("Error during analysis or save:", error);
-                        showModal("Analysis Error", `<p class="text-red-600">Failed to complete the analysis or save the record.</p><p>Details: ${error.message}</p>`);
+                        console.error("Error during analysis:", error);
+                        showModal("Analysis Error", `<p class="text-red-600">Failed to complete the analysis.</p><p>Details: ${error.message}</p>`);
+                        displayImmediateAlert('ERROR');
                     } finally {
                         submitButton.disabled = false;
                         loadingIndicator.classList.add('hidden');
@@ -408,146 +351,6 @@
                 loadingIndicator.classList.add('hidden');
             }
         });
-
-        // --- History Listener and Renderer ---
-
-        function listenForRecords() {
-            const recordsCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/poop_records`);
-            // NOTE: Removed orderBy due to Canvas constraints. We will sort client-side.
-            const q = query(recordsCollectionRef);
-            
-            onSnapshot(q, (snapshot) => {
-                const records = [];
-                snapshot.forEach(doc => {
-                    records.push({ id: doc.id, ...doc.data() });
-                });
-                
-                // 🛑 Client-Side Sorting: Sort by timestamp (newest first)
-                records.sort((a, b) => {
-                    const timeA = a.timestamp ? a.timestamp.toMillis() : 0;
-                    const timeB = b.timestamp ? b.timestamp.toMillis() : 0;
-                    return timeB - timeA; // Descending order
-                });
-
-                renderHistory(records);
-                checkForAlerts(records);
-            }, (error) => {
-                console.error("Error listening to records:", error);
-                document.getElementById('historyList').innerHTML = `<p class="text-red-600 p-4 border rounded-lg">Failed to load history: ${error.message}</p>`;
-            });
-        }
-        
-        function renderHistory(records) {
-            const historyList = document.getElementById('historyList');
-            const recordCount = document.getElementById('recordCount');
-            const historyPlaceholder = document.getElementById('historyPlaceholder'); // Get element reference once
-            
-            historyList.innerHTML = '';
-            
-            if (records.length === 0) {
-                if (historyPlaceholder) { // Check for null before using classList
-                    historyPlaceholder.classList.remove('hidden');
-                }
-                recordCount.textContent = '(0 records)';
-                return;
-            }
-            
-            if (historyPlaceholder) { // Check for null before using classList
-                historyPlaceholder.classList.add('hidden');
-            }
-            
-            recordCount.textContent = `(${records.length} records)`;
-
-            records.forEach(record => {
-                const dateString = formatTimestamp(record.timestamp);
-                const mimeType = record.mimeType || 'image/jpeg';
-                const card = document.createElement('div');
-                card.className = 'bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200 space-y-3';
-                card.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <div class="text-sm font-medium text-gray-800">${dateString}</div>
-                        ${createStatusBadge(record.status)}
-                    </div>
-                    
-                    <div class="flex space-x-4">
-                        <img src="data:${mimeType};base64,${record.base64Image}" alt="Poop Photo" 
-                             class="w-20 h-20 object-cover rounded-md border border-gray-300 cursor-pointer" 
-                             onclick="showImageModal('${record.base64Image}', '${dateString}', '${mimeType}')">
-                        
-                        <div class="flex-1 text-sm">
-                            <p class="text-gray-700"><strong>Food:</strong> ${record.foodNotes || 'N/A'}</p>
-                            <p class="text-gray-700"><strong>Symptoms:</strong> ${record.symptomsNotes || 'None'}</p>
-                        </div>
-                    </div>
-                    <button class="view-analysis-btn text-blue-600 hover:text-blue-800 font-medium text-sm mt-2" data-analysis="${btoa(record.analysisText)}">
-                        View AI Analysis Details
-                    </button>
-                `;
-                historyList.appendChild(card);
-            });
-
-            // Add click listeners for "View AI Analysis Details" buttons
-            document.querySelectorAll('.view-analysis-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const analysisBase64 = e.target.getAttribute('data-analysis');
-                    const analysisText = atob(analysisBase64);
-                    showModal("AI Analysis Details", analysisText.replace(/\n/g, '<br>'));
-                });
-            });
-        }
-        
-        window.showImageModal = function(base64Image, title, mimeType = 'image/jpeg') {
-            const imgHtml = `<img src="data:${mimeType};base64,${base64Image}" alt="Poop Photo" class="max-w-full h-auto rounded-lg shadow-lg">`;
-            showModal(`Photo from ${title}`, imgHtml);
-        }
-
-        // --- Alert Trigger Logic ---
-
-        function checkForAlerts(records) {
-            const alertContainer = document.getElementById('alertContainer');
-            alertContainer.innerHTML = '';
-            alertContainer.classList.add('hidden');
-            
-            if (records.length === 0) return;
-
-            const latestStatus = records[0].status;
-            let previousStatus = records.length > 1 ? records[1].status : 'UNKNOWN';
-            
-            let alertMessage = null;
-            let alertType = 'warning'; // Default type for monitoring
-
-            // Rule 1: Immediate VET_URGENT status
-            if (latestStatus === 'VET_URGENT') {
-                alertMessage = "🔴 **VET URGENT:** The latest analysis suggests severe abnormalities. **Please contact your veterinarian immediately.** Do not wait.";
-                alertType = 'danger';
-            } 
-            // Rule 2: Escalation (e.g., from NORMAL to MONITOR)
-            else if (latestStatus === 'MONITOR' && previousStatus === 'NORMAL') {
-                alertMessage = "⚠️ **STATUS CHANGE:** The latest record has escalated from NORMAL to **MONITOR**. Pay close attention to your dog's behavior and consider consulting your vet if symptoms worsen.";
-                alertType = 'warning';
-            }
-            // Rule 3: Continued Monitoring
-            else if (latestStatus === 'MONITOR' && previousStatus === 'MONITOR') {
-                 alertMessage = "🟡 **CONTINUED MONITORING:** Your dog has remained in a **MONITOR** status across multiple records. If symptoms persist or worsen, please schedule a check-up with your veterinarian.";
-                alertType = 'warning';
-            }
-
-            if (alertMessage) {
-                const colorMap = {
-                    danger: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-400' },
-                    warning: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-400' }
-                };
-                const colors = colorMap[alertType];
-
-                alertContainer.innerHTML = `
-                    <div class="${colors.bg} ${colors.text} border-l-4 ${colors.border} p-4 rounded-lg shadow-md">
-                        <p class="font-bold">${alertMessage.split('**')[1] || 'Alert'}</p>
-                        <p class="text-sm mt-1">${alertMessage.replace(/<[^>]*>?/gm, '').replace(/\*\*/g, '').split('**')[2] || 'Please review the record details.'}</p>
-                    </div>
-                `;
-                alertContainer.classList.remove('hidden');
-            }
-        }
 
         // --- Initial Load Logic ---
 
@@ -577,9 +380,6 @@
                     preview.style.backgroundImage = 'none';
                 }
             });
-
-            // Start Firebase setup
-            initializeFirebase();
         });
     </script>
 </body>
