@@ -1,461 +1,585 @@
+<!-- 
+  Dog Health Tracker Application 
+  Built using HTML, Tailwind CSS, JavaScript, Firebase, and Gemini API.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pooch Monitor: Health Tracker</title>
+    <title>Pooch Monitor</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Use Inter font family -->
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f7fafc; }
-        /* Custom scrollbar for better aesthetics */
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .spinner { border-top-color: #3b82f6; -webkit-animation: spin 1s ease-in-out infinite; animation: spin 1s ease-in-out infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Slate 50 */
+        }
+        /* Style for photo preview placeholder */
+        #photoPreview {
+            background-color: #e2e8f0; /* Slate 200 */
+            background-image: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b; /* Slate 500 */
+            font-size: 0.875rem;
+            text-align: center;
+        }
+        #photoPreview::after {
+            content: "Photo Preview";
+        }
+        #photoPreview:not(.hidden)::after {
+            content: ""; /* Hide text when image is loaded */
+        }
     </style>
-    <!-- Firebase Imports -->
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 sm:p-6">
+    <div id="app" class="w-full max-w-2xl bg-white shadow-xl rounded-xl p-6 md:p-8 space-y-8">
+        <!-- Header -->
+        <header class="text-center space-y-2">
+            <h1 class="text-4xl font-extrabold text-blue-800 tracking-tight">Pooch Monitor 🐾</h1>
+            <p class="text-gray-500">Track, analyze, and monitor your dog's daily health records.</p>
+        </header>
+
+        <!-- Alert Message Box -->
+        <div id="alertContainer" class="hidden">
+            <!-- Alert content will be injected here -->
+        </div>
+
+        <!-- Submission Form -->
+        <section class="border border-gray-200 rounded-lg p-5 space-y-5">
+            <h2 class="text-2xl font-semibold text-gray-700">New Health Record</h2>
+            <form id="recordForm" class="space-y-4">
+                
+                <!-- Date/Time Display -->
+                <div class="flex flex-col sm:flex-row sm:space-x-4">
+                    <div class="w-full sm:w-1/2">
+                        <label class="block text-sm font-medium text-gray-700">Date/Time</label>
+                        <p id="dateTimeDisplay" class="mt-1 p-2 bg-gray-100 rounded-md text-gray-600 font-mono"></p>
+                    </div>
+                    <!-- User ID Display -->
+                    <div class="w-full sm:w-1/2 mt-4 sm:mt-0">
+                        <label class="block text-sm font-medium text-gray-700">Your User ID (for history)</label>
+                        <p id="userIdDisplay" class="mt-1 p-2 bg-gray-100 rounded-md text-sm text-gray-500 truncate font-mono"></p>
+                    </div>
+                </div>
+
+                <!-- Poop Photo Upload -->
+                <div>
+                    <label for="poopPhoto" class="block text-sm font-medium text-gray-700 mb-2">
+                        Upload Poop Photo (Camera Ready)
+                    </label>
+                    <input type="file" id="poopPhoto" accept="image/jpeg,image/png" capture="camera" required
+                           class="w-full text-sm text-gray-500
+                                  file:mr-4 file:py-2 file:px-4
+                                  file:rounded-full file:border-0
+                                  file:text-sm file:font-semibold
+                                  file:bg-blue-50 file:text-blue-700
+                                  hover:file:bg-blue-100"/>
+                </div>
+                <div id="photoPreview" class="hidden w-32 h-32 mt-2 object-cover rounded-lg border-2 border-gray-200"></div>
+
+                <!-- Food Eaten Notes -->
+                <div>
+                    <label for="foodNotes" class="block text-sm font-medium text-gray-700">
+                        Food Eaten (Last 12 hours)
+                    </label>
+                    <textarea id="foodNotes" rows="2" placeholder="e.g., Chicken and rice, 1 cup kibble (Brand X)"
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                </div>
+
+                <!-- Symptoms Notes -->
+                <div>
+                    <label for="symptomsNotes" class="block text-sm font-medium text-gray-700">
+                        Any Symptoms? (Energy, Thirst, Vomiting)
+                    </label>
+                    <textarea id="symptomsNotes" rows="2" placeholder="e.g., Seems lethargic, drinking more water today"
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="submitButton"
+                        class="w-full py-3 px-4 border border-transparent rounded-lg shadow-lg text-sm font-medium text-white 
+                               bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
+                               transition duration-150 ease-in-out disabled:bg-gray-400">
+                    Analyze & Save Record
+                </button>
+                <div id="loadingIndicator" class="hidden text-center text-blue-600 font-semibold mt-2">
+                    Analyzing photo and consulting the AI...
+                </div>
+            </form>
+        </section>
+
+        <!-- History Section -->
+        <section class="space-y-4">
+            <h2 class="text-2xl font-semibold text-gray-700 flex justify-between items-center">
+                Health History
+                <span id="recordCount" class="text-sm text-gray-500 font-normal"></span>
+            </h2>
+            <div id="historyList" class="space-y-4">
+                <p id="historyPlaceholder" class="text-center text-gray-500 p-4 border rounded-lg">
+                    No records found yet. Submit a new analysis above!
+                </p>
+                <!-- Records will be injected here -->
+            </div>
+        </section>
+    </div>
+
+    <!-- Modals for LLM Response and Errors -->
+    <div id="modalOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-50">
+        <div id="modalContent" class="bg-white rounded-lg p-6 w-full max-w-lg shadow-2xl space-y-4">
+            <h3 id="modalTitle" class="text-xl font-bold text-gray-800">AI Analysis Complete</h3>
+            <div id="modalBody" class="text-gray-600 max-h-96 overflow-y-auto"></div>
+            <div class="flex justify-end">
+                <button onclick="closeModal()" class="py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, query, orderBy, limit, addDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            onSnapshot, 
+            query, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global Firebase variables will be populated here
-        window.firebase = {};
-
-        // --- Global Constants from Environment (MANDATORY) ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // --- System-Provided Global Variables ---
+        // These variables are automatically injected by the environment for secure access.
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // ------------------------------------------
+
+        // Global variables for Firebase services and user data
+        let app, db, auth;
+        let userId = null;
+        
+        // --- LLM API Configuration ---
         const LLM_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=";
-        const apiKey = "" // API key is provided by the canvas environment
+        const apiKey = ""; // Canvas provides this dynamically when running here
 
-        setLogLevel('Debug');
+        // --- Utility Functions ---
 
-        /**
-         * Initializes Firebase and authenticates the user.
-         */
-        async function initFirebase() {
+        /** Formats a timestamp into a readable date and time string. */
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return 'N/A';
+            // Check if it's a Firestore Timestamp object or a JS date/ms
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleString();
+        }
+
+        /** Creates a status badge for the history display. */
+        function createStatusBadge(status) {
+            let color, text;
+            switch (status) {
+                case 'VET_URGENT':
+                    color = 'bg-red-500';
+                    text = 'VET URGENT';
+                    break;
+                case 'MONITOR':
+                    color = 'bg-yellow-500';
+                    text = 'MONITOR';
+                    break;
+                case 'NORMAL':
+                default:
+                    color = 'bg-green-500';
+                    text = 'NORMAL';
+            }
+            return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color} text-white">${text}</span>`;
+        }
+        
+        /** Shows the custom modal with content. */
+        function showModal(title, content) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalBody').innerHTML = content;
+            document.getElementById('modalOverlay').classList.remove('hidden');
+            document.getElementById('modalOverlay').classList.add('flex');
+        }
+
+        window.closeModal = function() {
+            document.getElementById('modalOverlay').classList.remove('flex');
+            document.getElementById('modalOverlay').classList.add('hidden');
+        }
+
+        // --- Firebase Initialization and Auth ---
+
+        async function initializeFirebase() {
             try {
-                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                    console.error("Firebase config is missing.");
-                    document.getElementById('analysis-status').textContent = "Error: Firebase configuration is missing.";
-                    return;
+                if (!firebaseConfig.apiKey) {
+                    throw new Error("Firebase configuration is missing. Cannot initialize application.");
                 }
 
-                const app = initializeApp(firebaseConfig);
-                const db = getFirestore(app);
-                const auth = getAuth(app);
-
-                window.firebase.db = db;
-                window.firebase.auth = auth;
-                window.firebase.appId = appId;
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
                 
-                let userId = null;
-
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        console.log("Authenticated with UID:", userId);
-                        window.firebase.userId = userId;
-                        window.setupListeners();
-                    } else {
-                        // Attempt to authenticate
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    }
-                });
+                // Use the provided custom token for secure sign-in, or fall back to anonymous
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                userId = auth.currentUser.uid;
+                document.getElementById('userIdDisplay').textContent = userId;
+                
+                // Start listening for data changes after successful auth
+                listenForRecords();
             } catch (error) {
-                console.error("Firebase initialization or authentication failed:", error);
+                console.error("Firebase initialization or sign-in failed:", error);
+                showModal("Setup Error", `<p class="text-red-600">Failed to initialize the application.</p><p>Error: ${error.message}</p>`);
             }
         }
+        
+        // --- LLM Interaction Functions ---
 
-        /**
-         * Converts a File object to a Base64 string for the API.
-         * @param {File} file 
-         * @returns {Promise<string>} Base64 data string
-         */
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = error => reject(error);
-            });
-        }
-
-        /**
-         * Generates the API call payload.
-         * @param {string} base64Image
-         * @param {string} mimeType
-         * @param {string} prompt
-         * @returns {Object}
-         */
-        function generateApiPayload(base64Image, mimeType, prompt) {
-            const systemPrompt = "You are a specialized Veterinary Assistant AI. Analyze the provided image of dog feces and the accompanying health notes. Provide a brief (2-3 sentence) summary of your findings on color, consistency, and presence of anomalies. Conclude your response with a clear status indicator. Only use one of these three status markers at the very start of your reply: 'STATUS: NORMAL', 'STATUS: MONITOR', or 'STATUS: VET_URGENT'. Do not add any extra text before the status. E.g., 'STATUS: NORMAL. The feces appear...', 'STATUS: VET_URGENT. The photo suggests...'.";
+        /** Generates the payload for the Gemini API. */
+        function generateApiPayload(base64Image, foodNotes, symptomsNotes) {
+            const systemPrompt = `You are an expert veterinary assistant specializing in canine stool analysis. 
+                Analyze the provided photo of dog poop along with the owner's notes.
+                Provide a structured, three-part response in plain text.
+                
+                1. ANALYSIS: Describe the visible characteristics (consistency, color, content).
+                2. ADVICE: Provide non-diagnostic, general wellness advice based on the photo and notes.
+                3. STATUS: Provide a single, all-caps keyword on a new line: VET_URGENT, MONITOR, or NORMAL.
+                   - VET_URGENT: Use for severe abnormalities (bright red blood, black/tarry, excessive mucus, extreme liquid/watery).
+                   - MONITOR: Use for mild or concerning changes (slightly soft, unusual color not severe, minor straining).
+                   - NORMAL: Use for healthy-looking stool.
+                
+                Owner's Notes: Food: ${foodNotes}. Symptoms: ${symptomsNotes}.
+            `;
 
             return {
-                contents: [{
-                    role: "user",
-                    parts: [
-                        { text: prompt },
-                        {
-                            inlineData: {
-                                mimeType: mimeType,
-                                data: base64Image
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { text: "Analyze this dog stool photo based on the notes below." },
+                            {
+                                inlineData: {
+                                    mimeType: "image/jpeg", // Assume JPEG/PNG for camera output
+                                    data: base64Image
+                                }
                             }
-                        }
-                    ]
-                }],
+                        ]
+                    }
+                ],
                 systemInstruction: {
                     parts: [{ text: systemPrompt }]
                 }
             };
         }
 
-        /**
-         * Calls the Gemini API for analysis.
-         * @param {Object} payload 
-         * @returns {Promise<{text: string, status: string}>}
-         */
-        async function callGeminiApi(payload) {
-            let attempt = 0;
-            const maxRetries = 5;
-
-            while (attempt < maxRetries) {
+        /** Calls the Gemini API with exponential backoff. */
+        async function callGeminiApi(payload, retries = 3, delay = 1000) {
+            const url = LLM_API_URL + apiKey;
+            for (let i = 0; i < retries; i++) {
                 try {
-                    const response = await fetch(LLM_API_URL, {
+                    const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
 
+                    if (response.status === 429) {
+                        if (i < retries - 1) {
+                            console.warn(`Rate limit hit. Retrying in ${delay / 1000}s...`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 2; // Exponential backoff
+                            continue;
+                        }
+                        throw new Error("API rate limit exceeded after all retries.");
+                    }
+
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        throw new Error(`API request failed with status: ${response.status}`);
                     }
 
                     const result = await response.json();
-                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "Analysis failed to produce text.";
-                    
-                    // Simple parsing for the STATUS marker
-                    let status = "UNKNOWN";
-                    const statusMatch = text.match(/STATUS: (NORMAL|MONITOR|VET_URGENT)/);
-                    if (statusMatch) {
-                        status = statusMatch[1];
-                    }
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
-                    return { text: text.replace(/STATUS: (NORMAL|MONITOR|VET_URGENT)\.?\s*/, '').trim(), status };
+                    if (!text) {
+                        throw new Error("Received empty or malformed response from LLM.");
+                    }
+                    
+                    return text;
 
                 } catch (error) {
-                    attempt++;
-                    console.error(`Attempt ${attempt} failed:`, error);
-                    if (attempt >= maxRetries) {
-                        throw new Error("Failed to connect to AI after multiple retries.");
-                    }
-                    // Exponential backoff
-                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+                    console.error("Error calling Gemini API:", error);
+                    if (i === retries - 1) throw error;
+                    // Continue loop to retry
                 }
             }
+            throw new Error("Failed to call LLM API after all retries.");
         }
-        
-        /**
-         * Renders the history from Firestore and checks for alerts.
-         * @param {Array} records 
-         */
-        function renderHistory(records) {
-            const historyContainer = document.getElementById('history-records');
-            const alertBox = document.getElementById('vet-alert');
-            historyContainer.innerHTML = '';
-            alertBox.classList.add('hidden'); // Reset alert
 
-            if (records.length > 0) {
-                // Check for alert if we have at least two records
-                if (records.length >= 2) {
-                    const currentStatus = records[0].analysisStatus;
-                    const previousStatus = records[1].analysisStatus;
 
-                    if (currentStatus === 'VET_URGENT' || (currentStatus === 'MONITOR' && previousStatus === 'NORMAL')) {
-                        alertBox.classList.remove('hidden');
-                        alertBox.innerHTML = `
-                            <div class="flex items-center space-x-2">
-                                <svg class="w-6 h-6 text-red-700" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
-                                <p class="font-bold text-red-800">Alert: Status Change Detected!</p>
-                            </div>
-                            <p class="text-sm mt-1">The current entry shows a status of <span class="font-semibold">${currentStatus}</span>, which is a change from the previous <span class="font-semibold">${previousStatus}</span>. Please contact your veterinarian for professional guidance.</p>
-                        `;
-                    }
-                }
+        // --- Form Submission and Data Saving ---
 
-                records.forEach((record, index) => {
-                    let statusColor = 'bg-gray-200 text-gray-800';
-                    let statusIcon = 'ⓘ';
-                    if (record.analysisStatus === 'NORMAL') {
-                        statusColor = 'bg-green-100 text-green-700';
-                        statusIcon = '✓';
-                    } else if (record.analysisStatus === 'MONITOR') {
-                        statusColor = 'bg-yellow-100 text-yellow-700';
-                        statusIcon = '!';
-                    } else if (record.analysisStatus === 'VET_URGENT') {
-                        statusColor = 'bg-red-100 text-red-700';
-                        statusIcon = '🚨';
-                    }
+        document.getElementById('recordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const photoInput = document.getElementById('poopPhoto');
+            const foodNotes = document.getElementById('foodNotes').value.trim();
+            const symptomsNotes = document.getElementById('symptomsNotes').value.trim();
+            const submitButton = document.getElementById('submitButton');
+            const loadingIndicator = document.getElementById('loadingIndicator');
 
-                    const card = `
-                        <div class="bg-white p-4 rounded-lg shadow-md border-l-4 ${record.analysisStatus === 'VET_URGENT' ? 'border-red-500' : record.analysisStatus === 'MONITOR' ? 'border-yellow-500' : 'border-blue-500'} mb-4">
-                            <div class="flex justify-between items-start mb-2 border-b pb-2">
-                                <h3 class="font-bold text-lg text-blue-800">${new Date(record.timestamp).toLocaleString()}</h3>
-                                <span class="px-3 py-1 text-xs font-semibold rounded-full ${statusColor} flex items-center space-x-1">
-                                    <span>${statusIcon}</span>
-                                    <span>${record.analysisStatus || 'UNKNOWN'}</span>
-                                </span>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 text-sm">
-                                <div>
-                                    <p class="font-semibold text-gray-600">Food Eaten:</p>
-                                    <p class="text-gray-700 mb-2">${record.foodNotes || 'N/A'}</p>
-                                    <p class="font-semibold text-gray-600">Dog Symptoms:</p>
-                                    <p class="text-gray-700">${record.symptomsNotes || 'N/A'}</p>
-                                </div>
-                                <div class="mt-4 md:mt-0">
-                                    <p class="font-semibold text-gray-600">AI Analysis:</p>
-                                    <p class="text-gray-700 bg-gray-50 p-3 rounded-md italic">${record.analysisResult || 'No result available.'}</p>
-                                </div>
-                            </div>
-                            <p class="text-xs text-right text-gray-400 mt-2">Record ID: ${record.id.substring(0, 8)}</p>
-                        </div>
-                    `;
-                    historyContainer.innerHTML += card;
-                });
-            } else {
-                historyContainer.innerHTML = '<p class="text-center text-gray-500 p-8">No records found. Submit your first analysis above!</p>';
+            if (!photoInput.files[0]) {
+                showModal("Error", "<p>Please upload a photo of the dog poop.</p>");
+                return;
             }
-        }
-
-        /**
-         * Sets up the real-time listener for Firestore history.
-         */
-        window.setupListeners = function() {
-            const db = window.firebase.db;
-            const userId = window.firebase.userId;
-            const appId = window.firebase.appId;
-
-            if (!db || !userId) {
-                console.error("Firebase not ready or User ID missing for listeners.");
+            if (!userId) {
+                showModal("Error", "<p>Application not ready. Please wait for Firebase initialization.</p>");
                 return;
             }
 
-            // Path for private data: /artifacts/{appId}/users/{userId}/{collectionName}
-            const collectionPath = `artifacts/${appId}/users/${userId}/poop_records`;
-            const q = collection(db, collectionPath);
-
-            // Fetch and sort locally as firestore's orderBy requires indices which can lead to errors.
-            // We fetch the entire collection (or use a large limit) and sort in JS.
-            onSnapshot(q, (snapshot) => {
-                const records = [];
-                snapshot.forEach((doc) => {
-                    records.push({ id: doc.id, ...doc.data() });
-                });
-
-                // Sort by timestamp descending
-                records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                renderHistory(records);
-            }, (error) => {
-                console.error("Error listening to history:", error);
-                document.getElementById('analysis-status').textContent = `Error loading history: ${error.message}`;
-            });
-        }
-
-        /**
-         * Handles the form submission.
-         */
-        window.submitAnalysis = async function() {
-            const statusDiv = document.getElementById('analysis-status');
-            const form = document.getElementById('analysis-form');
-            const photoInput = document.getElementById('photo-input');
-            const submitButton = document.getElementById('submit-button');
-            const spinner = document.getElementById('spinner');
-
-            if (!window.firebase.db || !window.firebase.userId) {
-                statusDiv.textContent = "Error: Authentication not complete. Please wait a moment and try again.";
-                statusDiv.className = "text-red-600 mt-4";
-                return;
-            }
-
-            const photoFile = photoInput.files[0];
-            const foodNotes = document.getElementById('food-notes').value;
-            const symptomsNotes = document.getElementById('symptoms-notes').value;
-            const timestamp = new Date().toISOString();
-
-            if (!photoFile) {
-                statusDiv.textContent = "Please take or select a photo of the sample.";
-                statusDiv.className = "text-yellow-600 mt-4";
-                return;
-            }
-
-            // UI feedback
-            statusDiv.textContent = "Analysis in progress. This may take a few seconds...";
-            statusDiv.className = "text-blue-600 mt-4";
             submitButton.disabled = true;
-            spinner.classList.remove('hidden');
+            loadingIndicator.classList.remove('hidden');
 
             try {
-                // 1. Convert image to Base64
-                const base64Data = await fileToBase64(photoFile);
-                const mimeType = photoFile.type;
+                const file = photoInput.files[0];
+                const reader = new FileReader();
 
-                // 2. Prepare prompt
-                const prompt = `Analyze this image of dog feces.
-                Date/Time: ${new Date(timestamp).toLocaleString()}
-                Food Notes: ${foodNotes || 'None provided.'}
-                Dog Symptoms: ${symptomsNotes || 'None provided.'}
-                Provide a professional, concise assessment (2-3 sentences) followed by the mandatory status marker (STATUS: NORMAL, MONITOR, or VET_URGENT).`;
+                reader.onloadend = async function() {
+                    try {
+                        // Extract base64 part only
+                        // We also need to check the file type
+                        let mimeType = file.type;
+                        if (!mimeType.startsWith("image/")) mimeType = "image/jpeg"; // Default to jpeg if unknown
+                        
+                        const base64Image = reader.result.split(',')[1]; 
 
-                // 3. Call LLM API
-                const payload = generateApiPayload(base64Data, mimeType, prompt);
-                const analysisResult = await callGeminiApi(payload);
+                        // 1. Call LLM for analysis
+                        const payload = generateApiPayload(base64Image, foodNotes, symptomsNotes);
+                        const analysisText = await callGeminiApi(payload);
 
-                // 4. Save result to Firestore
-                const db = window.firebase.db;
-                const userId = window.firebase.userId;
-                const appId = window.firebase.appId;
-                const collectionPath = `artifacts/${appId}/users/${userId}/poop_records`;
+                        // 2. Extract Status from Analysis
+                        const lines = analysisText.split('\n');
+                        const statusLine = lines.find(line => 
+                            line.includes('VET_URGENT') || 
+                            line.includes('MONITOR') || 
+                            line.includes('NORMAL')
+                        ) || 'NORMAL';
+                        const status = statusLine.trim().toUpperCase();
+                        
+                        // 3. Save Record to Firestore
+                        await addDoc(collection(db, `artifacts/${appId}/users/${userId}/poop_records`), {
+                            timestamp: serverTimestamp(),
+                            foodNotes,
+                            symptomsNotes,
+                            analysisText,
+                            status: status,
+                            base64Image, // Save image for history viewing
+                            userId,
+                            mimeType // Save mime type for display
+                        });
 
-                await addDoc(collection(db, collectionPath), {
-                    timestamp: timestamp,
-                    foodNotes: foodNotes,
-                    symptomsNotes: symptomsNotes,
-                    analysisResult: analysisResult.text,
-                    analysisStatus: analysisResult.status,
-                });
+                        // 4. Show the Analysis Modal
+                        showModal("AI Analysis", analysisText.replace(/\n/g, '<br>'));
+                        
+                        // 5. Clear the form
+                        document.getElementById('recordForm').reset();
+                        document.getElementById('photoPreview').classList.add('hidden');
 
-                // 5. Success
-                statusDiv.textContent = `Analysis complete! Status: ${analysisResult.status}. Record saved.`;
-                statusDiv.className = "text-green-600 mt-4";
-                form.reset(); // Clear form after successful submission
+                    } catch (error) {
+                        console.error("Error during analysis or save:", error);
+                        showModal("Analysis Error", `<p class="text-red-600">Failed to complete the analysis or save the record.</p><p>Details: ${error.message}</p>`);
+                    } finally {
+                        submitButton.disabled = false;
+                        loadingIndicator.classList.add('hidden');
+                    }
+                }
+                reader.readAsDataURL(file);
 
             } catch (error) {
-                console.error("Submission failed:", error);
-                statusDiv.textContent = `Error during analysis or saving: ${error.message}`;
-                statusDiv.className = "text-red-600 mt-4";
-            } finally {
+                console.error("File reading error:", error);
                 submitButton.disabled = false;
-                spinner.classList.add('hidden');
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+
+        // --- History Listener and Renderer ---
+
+        function listenForRecords() {
+            const recordsCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/poop_records`);
+            // NOTE: Removed orderBy due to Canvas constraints. We will sort client-side.
+            const q = query(recordsCollectionRef);
+            
+            onSnapshot(q, (snapshot) => {
+                const records = [];
+                snapshot.forEach(doc => {
+                    records.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // 🛑 Client-Side Sorting: Sort by timestamp (newest first)
+                records.sort((a, b) => {
+                    const timeA = a.timestamp ? a.timestamp.toMillis() : 0;
+                    const timeB = b.timestamp ? b.timestamp.toMillis() : 0;
+                    return timeB - timeA; // Descending order
+                });
+
+                renderHistory(records);
+                checkForAlerts(records);
+            }, (error) => {
+                console.error("Error listening to records:", error);
+                document.getElementById('historyList').innerHTML = `<p class="text-red-600 p-4 border rounded-lg">Failed to load history: ${error.message}</p>`;
+            });
+        }
+        
+        function renderHistory(records) {
+            const historyList = document.getElementById('historyList');
+            const recordCount = document.getElementById('recordCount');
+            const historyPlaceholder = document.getElementById('historyPlaceholder'); // Get element reference once
+            
+            historyList.innerHTML = '';
+            
+            if (records.length === 0) {
+                if (historyPlaceholder) { // Check for null before using classList
+                    historyPlaceholder.classList.remove('hidden');
+                }
+                recordCount.textContent = '(0 records)';
+                return;
+            }
+            
+            if (historyPlaceholder) { // Check for null before using classList
+                historyPlaceholder.classList.add('hidden');
+            }
+            
+            recordCount.textContent = `(${records.length} records)`;
+
+            records.forEach(record => {
+                const dateString = formatTimestamp(record.timestamp);
+                const mimeType = record.mimeType || 'image/jpeg';
+                const card = document.createElement('div');
+                card.className = 'bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200 space-y-3';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm font-medium text-gray-800">${dateString}</div>
+                        ${createStatusBadge(record.status)}
+                    </div>
+                    
+                    <div class="flex space-x-4">
+                        <img src="data:${mimeType};base64,${record.base64Image}" alt="Poop Photo" 
+                             class="w-20 h-20 object-cover rounded-md border border-gray-300 cursor-pointer" 
+                             onclick="showImageModal('${record.base64Image}', '${dateString}', '${mimeType}')">
+                        
+                        <div class="flex-1 text-sm">
+                            <p class="text-gray-700"><strong>Food:</strong> ${record.foodNotes || 'N/A'}</p>
+                            <p class="text-gray-700"><strong>Symptoms:</strong> ${record.symptomsNotes || 'None'}</p>
+                        </div>
+                    </div>
+                    <button class="view-analysis-btn text-blue-600 hover:text-blue-800 font-medium text-sm mt-2" data-analysis="${btoa(record.analysisText)}">
+                        View AI Analysis Details
+                    </button>
+                `;
+                historyList.appendChild(card);
+            });
+
+            // Add click listeners for "View AI Analysis Details" buttons
+            document.querySelectorAll('.view-analysis-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const analysisBase64 = e.target.getAttribute('data-analysis');
+                    const analysisText = atob(analysisBase64);
+                    showModal("AI Analysis Details", analysisText.replace(/\n/g, '<br>'));
+                });
+            });
+        }
+        
+        window.showImageModal = function(base64Image, title, mimeType = 'image/jpeg') {
+            const imgHtml = `<img src="data:${mimeType};base64,${base64Image}" alt="Poop Photo" class="max-w-full h-auto rounded-lg shadow-lg">`;
+            showModal(`Photo from ${title}`, imgHtml);
+        }
+
+        // --- Alert Trigger Logic ---
+
+        function checkForAlerts(records) {
+            const alertContainer = document.getElementById('alertContainer');
+            alertContainer.innerHTML = '';
+            alertContainer.classList.add('hidden');
+            
+            if (records.length === 0) return;
+
+            const latestStatus = records[0].status;
+            let previousStatus = records.length > 1 ? records[1].status : 'UNKNOWN';
+            
+            let alertMessage = null;
+            let alertType = 'warning'; // Default type for monitoring
+
+            // Rule 1: Immediate VET_URGENT status
+            if (latestStatus === 'VET_URGENT') {
+                alertMessage = "🔴 **VET URGENT:** The latest analysis suggests severe abnormalities. **Please contact your veterinarian immediately.** Do not wait.";
+                alertType = 'danger';
+            } 
+            // Rule 2: Escalation (e.g., from NORMAL to MONITOR)
+            else if (latestStatus === 'MONITOR' && previousStatus === 'NORMAL') {
+                alertMessage = "⚠️ **STATUS CHANGE:** The latest record has escalated from NORMAL to **MONITOR**. Pay close attention to your dog's behavior and consider consulting your vet if symptoms worsen.";
+                alertType = 'warning';
+            }
+            // Rule 3: Continued Monitoring
+            else if (latestStatus === 'MONITOR' && previousStatus === 'MONITOR') {
+                 alertMessage = "🟡 **CONTINUED MONITORING:** Your dog has remained in a **MONITOR** status across multiple records. If symptoms persist or worsen, please schedule a check-up with your veterinarian.";
+                alertType = 'warning';
+            }
+
+            if (alertMessage) {
+                const colorMap = {
+                    danger: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-400' },
+                    warning: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-400' }
+                };
+                const colors = colorMap[alertType];
+
+                alertContainer.innerHTML = `
+                    <div class="${colors.bg} ${colors.text} border-l-4 ${colors.border} p-4 rounded-lg shadow-md">
+                        <p class="font-bold">${alertMessage.split('**')[1] || 'Alert'}</p>
+                        <p class="text-sm mt-1">${alertMessage.replace(/<[^>]*>?/gm, '').replace(/\*\*/g, '').split('**')[2] || 'Please review the record details.'}</p>
+                    </div>
+                `;
+                alertContainer.classList.remove('hidden');
             }
         }
 
-        // Initialize Firebase on window load
-        window.onload = initFirebase;
-    </script>
-</head>
-<body class="bg-gray-50 min-h-screen">
-    <div class="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-        <!-- Header -->
-        <header class="text-center mb-10 pt-4">
-            <h1 class="text-4xl font-extrabold text-blue-900 tracking-tight">Pooch Monitor</h1>
-            <p class="mt-2 text-xl text-gray-600">Digital Health Log for Your Best Friend</p>
-            <p class="text-xs text-gray-400 mt-1">User ID: <span id="user-id-display">Loading...</span></p>
-        </header>
+        // --- Initial Load Logic ---
 
-        <!-- Main Content Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            <!-- Left Column: New Entry Form -->
-            <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-2xl h-fit sticky top-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">New Poop Log Entry</h2>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set initial date/time
+            const updateDateTime = () => {
+                document.getElementById('dateTimeDisplay').textContent = new Date().toLocaleString();
+            };
+            updateDateTime();
+            setInterval(updateDateTime, 1000); // Update every second
 
-                <form id="analysis-form" onsubmit="event.preventDefault(); submitAnalysis();">
-                    
-                    <!-- Auto-Populated Date/Time -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Entry Timestamp</label>
-                        <p id="current-timestamp" class="text-lg font-semibold text-blue-600"></p>
-                        <script>
-                            document.addEventListener('DOMContentLoaded', () => {
-                                document.getElementById('current-timestamp').textContent = new Date().toLocaleString();
-                                // Update every minute
-                                setInterval(() => {
-                                    document.getElementById('current-timestamp').textContent = new Date().toLocaleString();
-                                }, 60000);
-                            });
-                        </script>
-                    </div>
-
-                    <!-- Photo Input (Camera/File) -->
-                    <div class="mb-6">
-                        <label for="photo-input" class="block text-sm font-medium text-gray-700 mb-1">
-                            Photo (Use Camera or Upload)
-                        </label>
-                        <input type="file" id="photo-input" accept="image/*" capture="camera" required
-                                class="w-full text-sm text-gray-500
-                                file:mr-4 file:py-2 file:px-4
-                                file:rounded-lg file:border-0
-                                file:text-sm file:font-semibold
-                                file:bg-blue-50 file:text-blue-700
-                                hover:file:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <!-- Food Eaten Notes -->
-                    <div class="mb-6">
-                        <label for="food-notes" class="block text-sm font-medium text-gray-700 mb-1">
-                            Food Eaten (Past 12h)
-                        </label>
-                        <textarea id="food-notes" rows="3" placeholder="e.g., Brand X kibble, half carrot, new treat Y."
-                            class="mt-1 block w-full rounded-lg border border-gray-300 shadow-sm p-3 focus:border-blue-500 focus:ring-blue-500 resize-none"></textarea>
-                    </div>
-
-                    <!-- Symptoms Notes -->
-                    <div class="mb-6">
-                        <label for="symptoms-notes" class="block text-sm font-medium text-gray-700 mb-1">
-                            Dog Symptoms (e.g., Energy, Thirst, Vomiting)
-                        </label>
-                        <textarea id="symptoms-notes" rows="3" placeholder="e.g., Slightly lethargic, drinking more water."
-                            class="mt-1 block w-full rounded-lg border border-gray-300 shadow-sm p-3 focus:border-blue-500 focus:ring-blue-500 resize-none"></textarea>
-                    </div>
-
-                    <!-- Submit Button -->
-                    <button type="submit" id="submit-button"
-                            class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:opacity-50">
-                        Analyze & Save Entry
-                        <div id="spinner" class="spinner h-5 w-5 border-4 border-opacity-50 rounded-full hidden ml-3"></div>
-                    </button>
-                    
-                    <!-- Status Message -->
-                    <div id="analysis-status" class="mt-4 text-center text-sm font-medium"></div>
-                </form>
-            </div>
-
-            <!-- Right Column: History & Alerts -->
-            <div class="lg:col-span-2">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Health History & Alerts</h2>
-                
-                <!-- Vet Alert Box -->
-                <div id="vet-alert" class="hidden bg-red-200 border border-red-400 text-red-700 p-4 rounded-xl mb-6 shadow-md" role="alert">
-                    <!-- Alert content injected by JS -->
-                </div>
-
-                <!-- History Records -->
-                <div id="history-records" class="custom-scrollbar max-h-[80vh] overflow-y-auto">
-                    <p class="text-center text-gray-500 p-8">Loading history...</p>
-                </div>
-            </div>
-
-        </div>
-    </div>
-    <script>
-        // Update User ID Display after Auth
-        window.addEventListener('load', () => {
-            const authInterval = setInterval(() => {
-                const userId = window.firebase && window.firebase.userId;
-                if (userId) {
-                    document.getElementById('user-id-display').textContent = userId;
-                    clearInterval(authInterval);
+            // Photo preview logic
+            document.getElementById('poopPhoto').addEventListener('change', function(event) {
+                const preview = document.getElementById('photoPreview');
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        preview.style.backgroundImage = `url('${e.target.result}')`;
+                        preview.classList.remove('hidden');
+                        preview.style.backgroundSize = 'cover';
+                        preview.style.backgroundPosition = 'center';
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    preview.classList.add('hidden');
+                    preview.style.backgroundImage = 'none';
                 }
-            }, 500);
+            });
+
+            // Start Firebase setup
+            initializeFirebase();
         });
     </script>
 </body>
